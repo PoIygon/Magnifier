@@ -461,7 +461,7 @@ namespace Magnifier.Controllers
                 return Ok(JsonConvert.SerializeObject(new List<Comment>()));
             }
 
-            foreach (HtmlNode node in commentNodes)
+            Parallel.ForEach(commentNodes, node =>
             {
                 HtmlNode info = node.SelectSingleNode(".//div[@class=\"info\"]");
                 HtmlNode user = node.SelectSingleNode(".//a[@id=\"comment-user\"]");
@@ -481,11 +481,13 @@ namespace Magnifier.Controllers
                             ScratchCommentAuthor replyContainerUserAuthor = new ScratchCommentAuthor(replyContainerInfo.SelectSingleNode(".//div[@class=\"name\"]").InnerText.Trim(), replyContainerUser.SelectSingleNode(".//img[@class=\"avatar\"]").Attributes["src"].Value);
                             ScratchComment replyContainerUserScratchComment /* :) */ = new ScratchComment(int.Parse(replyContainer.SelectSingleNode(".//div[@class=\"comment \"]").Attributes["data-comment-id"].Value), replyContainerInfo.SelectSingleNode(".//div[@class=\"content\"]").InnerText.Trim().Replace("\n      ", ""), replyContainerUserAuthor, DateTime.Parse(replyContainerInfo.SelectSingleNode(".//span[@class=\"time\"]").Attributes["title"].Value));
 
-                            Comment r = commentService.Get(replyContainerUserScratchComment.id);
+                            Comment r = new Comment(replyContainerUserScratchComment.id, replyContainerUserScratchComment, true, new List<Comment>());
 
-                            if (r == null)
+                            Comment dbReply = commentService.Get(r.commentId);
+
+                            if (dbReply != null)
                             {
-                                r = new Comment(replyContainerUserScratchComment.id, replyContainerUserScratchComment, true, new List<Comment>());
+                                r.reactions = dbReply.reactions;
                             }
 
                             replies.Add(r);
@@ -494,20 +496,26 @@ namespace Magnifier.Controllers
                         }
                     }
 
-                    Comment c = commentService.Get(scratchComment.id);
+                    Comment c = new Comment(scratchComment.id, scratchComment, false, replies);
 
-                    if (c == null)
+                    Comment dbComment = commentService.Get(c.commentId);
+
+                    if (dbComment != null)
                     {
-                        c = new Comment(scratchComment.id, scratchComment, false, replies);
-                    }
-                    else
-                    {
-                        c.replies = replies;
+                        c.reactions = dbComment.reactions;
                     }
 
                     comments.Add(c);
-                }                
-            }
+                }
+            });
+
+            comments = comments
+                .Where(p => p.comment.datetime_created.HasValue)
+                .OrderBy(p => p.comment.datetime_created.Value)
+                .Reverse()
+                .ToList();
+
+            return Ok(System.Text.Json.JsonSerializer.Serialize(comments));
 
             List<Comment> dbComments = commentService.Get();
 
@@ -599,11 +607,13 @@ namespace Magnifier.Controllers
                             ScratchCommentAuthor replyContainerUserAuthor = new ScratchCommentAuthor(replyContainerInfo.SelectSingleNode(".//div[@class=\"name\"]").InnerText.Trim(), replyContainerUser.SelectSingleNode(".//img[@class=\"avatar\"]").Attributes["src"].Value);
                             ScratchComment replyContainerUserScratchComment /* :) */ = new ScratchComment(int.Parse(replyContainer.SelectSingleNode(".//div[@class=\"comment \"]").Attributes["data-comment-id"].Value), replyContainerInfo.SelectSingleNode(".//div[@class=\"content\"]").InnerText.Trim().Replace("\n      ", ""), replyContainerUserAuthor, DateTime.Parse(replyContainerInfo.SelectSingleNode(".//span[@class=\"time\"]").Attributes["title"].Value));
 
-                            Comment r = commentService.Get(replyContainerUserScratchComment.id);
+                            Comment r = new Comment(replyContainerUserScratchComment.id, replyContainerUserScratchComment, true, new List<Comment>());
 
-                            if (r == null)
+                            Comment dbReply = commentService.Get(r.commentId);
+
+                            if (dbReply != null)
                             {
-                                r = new Comment(replyContainerUserScratchComment.id, replyContainerUserScratchComment, true, new List<Comment>());
+                                r.reactions = dbReply.reactions;
                             }
 
                             replies.Add(r);
@@ -615,19 +625,19 @@ namespace Magnifier.Controllers
                     comments.Add(new Comment(scratchComment.id, scratchComment, false, replies));
                 }
 
-                Comment c = commentService.Get(scratchComment.id);
+                Comment c = new Comment(scratchComment.id, scratchComment, false, replies);
 
-                if (c == null)
+                Comment dbComment = commentService.Get(c.commentId);
+
+                if (dbComment != null)
                 {
-                    c = new Comment(scratchComment.id, scratchComment, false, replies);
-                }
-                else
-                {
-                    c.replies = replies;
+                    c.reactions = dbComment.reactions;
                 }
 
                 comments.Add(c);
             }
+
+            return Ok(System.Text.Json.JsonSerializer.Serialize(comments));
 
             List<Comment> dbComments = commentService.Get();
 
