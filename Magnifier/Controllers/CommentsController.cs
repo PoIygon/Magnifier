@@ -344,7 +344,13 @@ namespace Magnifier.Controllers
 
                     sendhelp.replies = replies;
 
-                    commentService.Update(comment.id, sendhelp);
+                    if (comment != sendhelp.comment)
+                    {
+                        new Thread(() =>
+                        {
+                            commentService.Update(comment.id, sendhelp);
+                        }).Start();
+                    }
                 }
             }
 
@@ -517,7 +523,7 @@ namespace Magnifier.Controllers
                 }
                 else
                 {
-                    if (!comment.isReply)
+                    if (!comment.isReply && comment != dbComments.Find(dbComment => dbComment.commentId == comment.commentId))
                     {
                         dbComments[dbComments.FindIndex(dbComment => dbComment.commentId == comment.commentId)] = comment;
                         new Thread(() =>
@@ -637,7 +643,7 @@ namespace Magnifier.Controllers
                 }
                 else
                 {
-                    if (!comment.isReply)
+                    if (!comment.isReply && comment != dbComments.Find(dbComment => dbComment.commentId == comment.commentId))
                     {
                         dbComments[dbComments.FindIndex(dbComment => dbComment.commentId == comment.commentId)] = comment;
                         new Thread(() =>
